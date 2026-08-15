@@ -1,0 +1,5 @@
+outs:
+- md5: c2bf264aa4a46de42a6be8e3d0f9dae1
+  size: 21876152
+  hash: md5
+  path: kaggle_supply_chain_orders.csv

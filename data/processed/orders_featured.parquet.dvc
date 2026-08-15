@@ -1,0 +1,5 @@
+outs:
+- md5: 3f7c6be823c9598a5c957c43985ce0f8
+  size: 6786632
+  hash: md5
+  path: orders_featured.parquet

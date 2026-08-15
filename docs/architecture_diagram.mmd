@@ -1,0 +1,67 @@
+flowchart TB
+    subgraph Sources["Data Sources"]
+        A1["Kaggle-style CSV export\norders (105K rows)"]
+        A2["Simulated shipping-carrier\nREST API (Flask)"]
+    end
+
+    subgraph Ingestion["Ingestion Layer"]
+        B1["extract_csv.py"]
+        B2["extract_shipping_api.py\n(pagination + retry)"]
+    end
+
+    subgraph Storage["Raw Storage (2 formats)"]
+        C1[("SQLite\nsupply_chain_raw.db")]
+        C2[("Parquet\ndata/raw/parquet/")]
+    end
+
+    subgraph Processing["Transformation & Feature Engineering"]
+        D1["clean.py\nmissing values, dedup,\ndate + coordinate validation"]
+        D2["engineer.py\n10 engineered features"]
+        D3["spark_processing.py\nPySpark aggregations +\nwindow functions"]
+    end
+
+    subgraph Quality["Data Quality"]
+        E1["Great Expectations\n21-expectation suite"]
+        E2["docs/data_quality_report.md"]
+    end
+
+    subgraph Output["ML-Ready Output"]
+        F1["build_ml_dataset.py\ntrain/test split"]
+        F2[("data/ml_ready/*.parquet, *.csv")]
+        F3["Analytics dashboard\n(Plotly HTML)"]
+    end
+
+    subgraph Orchestration["Orchestration (Airflow)"]
+        G1["DAG: supply_chain_logistics_pipeline\nextract -> store -> clean -> engineer -> validate -> spark -> ml_ready"]
+    end
+
+    subgraph Versioning["Versioning"]
+        H1["DVC-tracked datasets\n+ local remote"]
+    end
+
+    A1 --> B1
+    A2 --> B2
+    B1 --> C1
+    B1 --> C2
+    B2 --> C1
+    B2 --> C2
+    C1 --> D1
+    D1 --> D2
+    D2 --> E1
+    E1 --> E2
+    D2 --> D3
+    D3 --> F1
+    F1 --> F2
+    F2 --> F3
+
+    G1 -.orchestrates.-> B1
+    G1 -.orchestrates.-> B2
+    G1 -.orchestrates.-> D1
+    G1 -.orchestrates.-> D2
+    G1 -.orchestrates.-> E1
+    G1 -.orchestrates.-> D3
+    G1 -.orchestrates.-> F1
+
+    C1 -.versioned by.-> H1
+    D2 -.versioned by.-> H1
+    F2 -.versioned by.-> H1

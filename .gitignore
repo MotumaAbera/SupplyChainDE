@@ -1,0 +1,13 @@
+venv/
+.airflow/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+data/seed/
+data/raw/_tmp_*.parquet
+*.egg-info/
+.pytest_cache/
+
+
+#Ignore vscode AI rules
+.github\instructions\codacy.instructions.md
