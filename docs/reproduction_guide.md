@@ -126,8 +126,16 @@ docker compose -f docker/docker-compose.yml run --rm airflow-test
 # OR the full stack with the web UI:
 docker compose -f docker/docker-compose.yml up airflow-standalone
 # open http://localhost:8080, log in as admin / admin,
-# then trigger `supply_chain_logistics_pipeline`
+# then unpause and trigger `supply_chain_logistics_pipeline`
 ```
+
+Note that `airflow standalone` normally generates a *random* admin password
+(it ignores `_AIRFLOW_WWW_USER_*`, which only the official docker-compose
+entrypoint reads). The compose command therefore waits for that user to be
+created and resets the password to `admin`, so the credentials above are the
+ones that work. If you ever need the generated password instead, it is
+printed to the container log as `Login with username: admin  password: ...`
+and stored in `/opt/airflow/standalone_admin_password.txt`.
 
 The image (`docker/Dockerfile.airflow`) adds OpenJDK 17 on top of
 `apache/airflow:2.10.5`, because the `spark_processing` task needs a JVM and

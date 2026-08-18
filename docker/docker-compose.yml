@@ -37,15 +37,23 @@ services:
     command:
       - |
         python -m src.ingestion.shipping_api_server > /tmp/api.log 2>&1 &
-        exec airflow standalone
+        airflow standalone &
+        STANDALONE_PID=$$!
+        # `airflow standalone` creates its own admin user with a RANDOM
+        # password (it ignores _AIRFLOW_WWW_USER_*, which only the official
+        # docker-compose entrypoint honours). Wait for that user to exist,
+        # then force the password to a known value so the documented
+        # admin/admin credentials actually work.
+        until airflow users list 2>/dev/null | grep -q admin; do sleep 5; done
+        airflow users reset-password --username admin --password admin || true
+        echo "=== Airflow UI ready at http://localhost:8080 (admin / admin) ==="
+        wait $$STANDALONE_PID
     environment:
       AIRFLOW__CORE__EXECUTOR: SequentialExecutor
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       AIRFLOW__CORE__DAGS_FOLDER: /opt/project/dags
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: sqlite:////opt/airflow/airflow.db
       PYTHONPATH: /opt/project
-      _AIRFLOW_WWW_USER_USERNAME: admin
-      _AIRFLOW_WWW_USER_PASSWORD: admin
     ports:
       - "8080:8080"
 
