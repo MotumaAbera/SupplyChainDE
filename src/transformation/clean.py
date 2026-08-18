@@ -40,6 +40,23 @@ def clean_orders(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
     df["carrier"] = df["carrier"].str.strip()
     df["order_status"] = df["order_status"].str.strip().str.upper()
 
+    #    Impute categoricals a source genuinely lacks. Olist records no
+    #    shipping mode, so it is inferred from that row's own promised lead
+    #    time rather than guessed: the bands mirror the DataCo mode
+    #    definitions, so both sources end up on one comparable scale.
+    stats["missing_shipping_mode_before"] = int(df["shipping_mode"].isna().sum())
+    if stats["missing_shipping_mode_before"]:
+        inferred = pd.cut(
+            df["promised_delivery_days"],
+            bins=[-np.inf, 0, 2, 5, np.inf],
+            labels=["Same Day", "First Class", "Second Class", "Standard Class"],
+        ).astype(str)
+        df["shipping_mode"] = df["shipping_mode"].fillna(inferred)
+    df["shipping_mode"] = df["shipping_mode"].fillna("Standard Class")
+
+    #    product_category is missing for a small number of Olist rows.
+    df["product_category"] = df["product_category"].fillna("Unknown")
+
     # 4. Remove invalid coordinates (valid lat in [-90,90], lon in [-180,180])
     valid_coords = df["destination_latitude"].between(-90, 90) & df["destination_longitude"].between(-180, 180)
     stats["invalid_coordinates_removed"] = int((~valid_coords).sum())
@@ -57,6 +74,20 @@ def clean_orders(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
     stats["missing_shipping_cost_before"] = int(df["shipping_cost"].isna().sum())
     df["shipping_cost"] = df.groupby("shipping_mode")["shipping_cost"].transform(lambda s: s.fillna(s.median()))
     df["shipping_cost"] = df["shipping_cost"].fillna(df["shipping_cost"].median())
+
+    #    - distance_km: a few Olist postcodes have no geolocation entry, so the
+    #      geodesic could not be computed. Impute from the same destination
+    #      region, which is the closest comparable group available.
+    stats["missing_distance_km_before"] = int(df["distance_km"].isna().sum())
+    df["distance_km"] = df.groupby("destination_region")["distance_km"].transform(
+        lambda s: s.fillna(s.median()))
+    df["distance_km"] = df["distance_km"].fillna(df["distance_km"].median())
+
+    #    - weight_kg: impute from the product category median.
+    stats["missing_weight_kg_before"] = int(df["weight_kg"].isna().sum())
+    df["weight_kg"] = df.groupby("product_category")["weight_kg"].transform(
+        lambda s: s.fillna(s.median()))
+    df["weight_kg"] = df["weight_kg"].fillna(df["weight_kg"].median())
 
     # 6. Convert types
     df["quantity"] = df["quantity"].astype(int)

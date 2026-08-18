@@ -96,16 +96,34 @@ This writes `data/raw/kaggle_supply_chain_orders.csv` in the schema documented
 in `docs/data_dictionary.md`, reporting which columns mapped directly and which
 had to be derived (21/25 map directly for DataCo).
 
-**Then re-key Source #2 to the imported orders:**
+**Then add the second real dataset:**
+
+```bash
+python -m src.ingestion.download_olist
+```
+
+This writes two things:
+
+- `data/raw/olist_orders_mapped.csv` — 112,650 orders in the same schema,
+  joined across 7 Olist tables, with a **real** freight charge, product weight
+  and a haversine distance computed from the seller's *and* the customer's
+  postcode coordinates.
+- `data/seed/olist_tracking_events.parquet` — 446,937 **real** delivery
+  milestones, which the carrier API then serves as Source #2.
+
+The two datasets are unioned automatically by `extract_csv.py` (stacked, not
+joined — they share no key), each row tagged with `source_system`. Total:
+292,867 rows. **No other pipeline stage changes.**
+
+If you skip this step the pipeline still runs on DataCo alone; `extract_csv`
+reports that Olist is absent and continues.
+
+**Synthetic-events fallback.** With no Kaggle access the API can serve
+generated events instead, re-keyed to whatever orders file is in place:
 
 ```bash
 python -m src.ingestion.generate_seed_dataset --events-only
 ```
-
-The simulated carrier API serves tracking events joined on `order_id`. Events
-built against a different orders file would join to nothing, so this step is
-required after importing (or re-importing) Source #1. **No other pipeline stage
-changes.**
 
 The mapper normalises column names (case and punctuation insensitive) against
 an alias table in `download_kaggle.py`, so common Kaggle supply-chain namings

@@ -1,7 +1,7 @@
 {
   "expectations": [
     {
-      "id": "e9b780e5-21ce-4e3d-93b2-f9f448122a76",
+      "id": "41399ac0-7317-4c8f-9b31-008c4964ea8b",
       "kwargs": {
         "column": "order_id"
       },
@@ -10,7 +10,7 @@
       "type": "expect_column_values_to_be_unique"
     },
     {
-      "id": "ec37e1c2-1a11-4679-8ba2-a90d8f368209",
+      "id": "8b50ae6d-1b27-4ce3-be43-1080bc238d21",
       "kwargs": {
         "column": "order_id"
       },
@@ -19,7 +19,7 @@
       "type": "expect_column_values_to_not_be_null"
     },
     {
-      "id": "d4d7cd8e-3706-446c-8aa1-27a10c587096",
+      "id": "ee95ca46-b96c-4884-b054-2c611c84e99a",
       "kwargs": {
         "column": "order_date"
       },
@@ -28,7 +28,7 @@
       "type": "expect_column_values_to_not_be_null"
     },
     {
-      "id": "41547e04-6f2f-4230-9f74-c0d5f595e1f5",
+      "id": "6dd55440-7316-40ad-a5b1-965c7c99d49b",
       "kwargs": {
         "column": "carrier"
       },
@@ -37,16 +37,12 @@
       "type": "expect_column_values_to_not_be_null"
     },
     {
-      "id": "b0a6e398-8362-4bc0-9ee4-8985e12127ee",
+      "id": "cea0eef0-a2b4-4d1a-a009-7ae961ea3696",
       "kwargs": {
-        "column": "carrier",
+        "column": "source_system",
         "value_set": [
-          "DHL Express",
-          "FedEx",
-          "UPS",
-          "Maersk Line",
-          "DB Schenker",
-          "Local Courier Co"
+          "dataco",
+          "olist"
         ]
       },
       "meta": {},
@@ -54,7 +50,7 @@
       "type": "expect_column_values_to_be_in_set"
     },
     {
-      "id": "9b69a7c1-0ecf-4a5e-bf3a-6c28a9dff74b",
+      "id": "89039fa7-f840-4997-af68-0c8a6da5bbcd",
       "kwargs": {
         "column": "shipping_mode",
         "value_set": [
@@ -69,7 +65,7 @@
       "type": "expect_column_values_to_be_in_set"
     },
     {
-      "id": "38605b32-f6ce-43fd-b837-6ebdb6d0a81a",
+      "id": "3fec5675-3f2e-4745-b17f-4b4e5ee1c30c",
       "kwargs": {
         "column": "quantity",
         "max_value": 1000.0,
@@ -80,7 +76,7 @@
       "type": "expect_column_values_to_be_between"
     },
     {
-      "id": "e0190c1f-c028-4187-aa06-8ead6f20c12a",
+      "id": "5968ee63-c991-448a-b10c-9b7b462b2ff8",
       "kwargs": {
         "column": "unit_price",
         "max_value": 10000.0,
@@ -91,7 +87,7 @@
       "type": "expect_column_values_to_be_between"
     },
     {
-      "id": "68eb17d4-5d33-4c1f-b6d2-a830f0fab6e9",
+      "id": "4dc05457-9e9f-45ba-a302-1bcc2549a82a",
       "kwargs": {
         "column": "shipping_cost",
         "max_value": 5000.0,
@@ -102,7 +98,7 @@
       "type": "expect_column_values_to_be_between"
     },
     {
-      "id": "d4907ee0-0b09-4895-bd7e-4b5d7fb1d980",
+      "id": "efff6814-97d3-47df-9330-c1de558393fb",
       "kwargs": {
         "column": "destination_latitude",
         "max_value": 90.0,
@@ -113,7 +109,7 @@
       "type": "expect_column_values_to_be_between"
     },
     {
-      "id": "c1d577a4-70ef-4b1b-96cc-f996f72dac33",
+      "id": "a1bb901a-47f8-436d-a795-81493c4302a6",
       "kwargs": {
         "column": "destination_longitude",
         "max_value": 180.0,
@@ -124,7 +120,7 @@
       "type": "expect_column_values_to_be_between"
     },
     {
-      "id": "987d31fe-bb54-47ee-b0f6-8a4d44b69e9d",
+      "id": "1f5e57d0-3548-46a3-9be3-7c004d7e76e9",
       "kwargs": {
         "column": "distance_km",
         "max_value": 25000.0,
@@ -135,39 +131,39 @@
       "type": "expect_column_values_to_be_between"
     },
     {
-      "id": "db420fd3-6093-4eda-81ec-bbc9cc05efb6",
+      "id": "ff94faa9-f9e7-4ed9-993c-474ed5c7c905",
       "kwargs": {
         "column": "promised_delivery_days",
-        "max_value": 15.0,
-        "min_value": 1.0
+        "max_value": 180.0,
+        "min_value": 0.0
       },
       "meta": {},
       "severity": "critical",
       "type": "expect_column_values_to_be_between"
     },
     {
-      "id": "751905de-e6e9-4444-a39a-fdac2171b2b4",
+      "id": "90ceecb8-9a31-4977-9d0b-dff113d0816c",
       "kwargs": {
         "column": "actual_delivery_days",
-        "max_value": 60.0,
-        "min_value": 1.0
+        "max_value": 240.0,
+        "min_value": 0.0
       },
       "meta": {},
       "severity": "critical",
       "type": "expect_column_values_to_be_between"
     },
     {
-      "id": "7e620205-6029-43c0-8aca-068ae8764b6c",
+      "id": "6359d92e-ab47-411d-8e4a-ee5748babc80",
       "kwargs": {
         "column": "order_id",
-        "regex": "^ORD-\\d+$"
+        "regex": "^ORD-(OLIST-)?\\d+$"
       },
       "meta": {},
       "severity": "critical",
       "type": "expect_column_values_to_match_regex"
     },
     {
-      "id": "b5d7ea57-18cf-42e9-a579-e53d3b2826fb",
+      "id": "cc2002bb-9bd7-4f49-9180-c49d6fbe50a3",
       "kwargs": {
         "column": "carrier_performance_score",
         "max_value": 1.0,
@@ -178,7 +174,7 @@
       "type": "expect_column_values_to_be_between"
     },
     {
-      "id": "5fbc6170-a020-4e3f-9b57-1995f39a3a18",
+      "id": "8ce9dd5f-9aaf-4bd3-8f5c-39607afccdeb",
       "kwargs": {
         "column": "route_efficiency_score",
         "max_value": 1.0,
@@ -189,7 +185,7 @@
       "type": "expect_column_values_to_be_between"
     },
     {
-      "id": "c89f46e5-9ab3-4091-9f8a-5c6717e0958b",
+      "id": "6bacf649-0284-45f4-9a2d-efddf6bed349",
       "kwargs": {
         "column": "reorder_risk_score",
         "max_value": 1.0,
@@ -200,7 +196,7 @@
       "type": "expect_column_values_to_be_between"
     },
     {
-      "id": "12d520c2-5505-4638-a3bd-0f54dbf6bdd4",
+      "id": "3b93bfb8-6333-467f-84f9-4bcdeee7e49a",
       "kwargs": {
         "column": "distance_category",
         "value_set": [
@@ -215,7 +211,7 @@
       "type": "expect_column_values_to_be_in_set"
     },
     {
-      "id": "844101e3-6a0b-458e-86cf-c94457318d07",
+      "id": "4b4bd9d4-d5b2-4ac7-8413-5c19389da2a8",
       "kwargs": {
         "column": "shipment_size_category",
         "value_set": [
@@ -230,7 +226,7 @@
       "type": "expect_column_values_to_be_in_set"
     },
     {
-      "id": "8ce72000-e362-4a13-98be-8e3e548b29ab",
+      "id": "7c1ed1d3-962a-48ff-88ff-06ccb2d4df18",
       "kwargs": {
         "column": "is_delayed",
         "max_value": 0.6,
@@ -241,7 +237,7 @@
       "type": "expect_column_mean_to_be_between"
     }
   ],
-  "id": "2fd4c28b-8fba-4f73-ade9-b23f8f8db50d",
+  "id": "6472cc6a-39cc-4ab0-90f6-2be66895331c",
   "meta": {
     "great_expectations_version": "1.20.0"
   },

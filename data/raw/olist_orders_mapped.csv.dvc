@@ -1,0 +1,5 @@
+outs:
+- md5: 4600642692f1ece1075d143924508465
+  size: 27099616
+  hash: md5
+  path: olist_orders_mapped.csv

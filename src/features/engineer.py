@@ -91,9 +91,16 @@ def engineer_features(orders: pd.DataFrame, events: pd.DataFrame) -> pd.DataFram
     cap_map = {w["warehouse_id"]: w["capacity_units_per_day"] for w in WAREHOUSES}
     df["_order_day"] = df["order_date"].dt.date
     daily_wh_units = df.groupby(["origin_warehouse_id", "_order_day"])["quantity"].transform("sum")
-    df["warehouse_utilization"] = (
-        daily_wh_units / df["origin_warehouse_id"].map(cap_map)
-    ).round(4)
+
+    # Origins outside the reference table (e.g. Olist's real sellers, which
+    # have no published capacity) get an observed capacity instead: that
+    # origin's own busiest observed day. Utilization stays on a comparable
+    # 0-1-ish scale across both sources rather than going null.
+    capacity = df["origin_warehouse_id"].map(cap_map)
+    observed_peak = daily_wh_units.groupby(df["origin_warehouse_id"]).transform("max")
+    capacity = capacity.fillna(observed_peak).replace(0, np.nan)
+
+    df["warehouse_utilization"] = (daily_wh_units / capacity).round(4)
     df.drop(columns=["_order_day"], inplace=True)
 
     # --- 8. inventory_turnover ------------------------------------------------

@@ -1,10 +1,22 @@
 # Data Dictionary — Supply Chain Logistics Pipeline
 
-## 1. Raw source columns (`data/raw/kaggle_supply_chain_orders.csv`, Source #1)
+## 1. Raw source columns (Source #1 — two real Kaggle datasets, unioned)
+
+Both real datasets are mapped into the single schema below and stacked, giving
+292,867 rows:
+
+| File | Dataset | Rows |
+|---|---|---|
+| `data/raw/kaggle_supply_chain_orders.csv` | DataCo Smart Supply Chain | 180,519 |
+| `data/raw/olist_orders_mapped.csv` | Olist Brazilian E-Commerce | 112,650 |
+
+Which columns are real differs by source — see `docs/design_decisions.md`
+§10–§11 for the field-by-field provenance table.
 
 | Column | Type | Description |
 |---|---|---|
-| `order_id` | string | Unique order identifier (`ORD-######`) |
+| `source_system` | categorical | Provenance of the row: `dataco` or `olist`. Makes per-row lineage auditable, and lets models condition on source (the two differ sharply — 57.3% vs 7.3% delayed) |
+| `order_id` | string | Unique order identifier (`ORD-######`, or `ORD-OLIST-######` for Olist rows) |
 | `order_date` | date | Date the order was placed |
 | `customer_id` | string | Unique customer identifier |
 | `customer_segment` | categorical | Consumer / Corporate / Home Office |
@@ -27,16 +39,23 @@
 | `order_status` | categorical | COMPLETE / PENDING / PROCESSING / CANCELLED / ON_HOLD |
 | `delay_reason` | categorical | Weather / Customs Hold / Mechanical Issue / Traffic / Warehouse Backlog / None |
 
-## 2. Raw source: shipping tracking events (`shipping_events_raw`, Source #2 — simulated shipping-carrier API)
+## 2. Raw source: shipping tracking events (`shipping_events_raw`, Source #2 — carrier REST API)
+
+446,937 rows. These are **real** delivery milestones: each row is a genuine
+recorded timestamp from Olist's order lifecycle, served over HTTP by
+`src/ingestion/shipping_api_server.py` with pagination (894 pages), transient
+503s and rate-limit headers. The synthetic generator's event vocabulary
+(`PICKED_UP` / `IN_TRANSIT` / `CUSTOMS` / `OUT_FOR_DELIVERY` / `DELAYED`) is
+still supported as an offline fallback.
 
 | Column | Type | Description |
 |---|---|---|
 | `order_id` | string | Foreign key to orders |
-| `carrier` | categorical | Carrier handling the shipment |
-| `event_timestamp` | datetime | Timestamp of the tracking scan |
-| `event_type` | categorical | PICKED_UP / IN_TRANSIT / CUSTOMS / OUT_FOR_DELIVERY / DELAYED / DELIVERED |
-| `location` | string | Scan location (destination city) |
-| `delay_reason` | categorical | Populated only for DELAYED events |
+| `carrier` | categorical | Fulfilment party handling the shipment |
+| `event_timestamp` | datetime | Real recorded timestamp of the milestone |
+| `event_type` | categorical | ORDER_PLACED / PAYMENT_APPROVED / HANDED_TO_CARRIER / DELIVERED |
+| `location` | string | Destination city |
+| `delay_reason` | categorical | `Late delivery` on a late DELIVERED event, else `None` |
 
 ## 3. Engineered features (`data/processed/orders_featured.parquet`)
 

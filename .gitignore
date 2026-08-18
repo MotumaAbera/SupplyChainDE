@@ -17,3 +17,6 @@ gx/uncommitted/
 
 # Kaggle raw download staging area
 data/raw/kaggle_download/
+
+# Olist raw download staging area
+data/raw/olist_download/

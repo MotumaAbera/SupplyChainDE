@@ -19,7 +19,14 @@ import time
 import pandas as pd
 from flask import Flask, jsonify, request
 
-SEED_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "data", "seed", "shipping_events_seed.parquet")
+SEED_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "seed")
+
+# Preferred: the REAL delivery milestones extracted from Olist (order placed,
+# payment approved, handed to carrier, delivered) -- genuine recorded
+# timestamps, not simulated ones. Falls back to the synthetic generator's
+# events when Olist has not been downloaded.
+REAL_EVENTS_PATH = os.path.join(SEED_DIR, "olist_tracking_events.parquet")
+SYNTHETIC_EVENTS_PATH = os.path.join(SEED_DIR, "shipping_events_seed.parquet")
 
 app = Flask(__name__)
 _events_df = None
@@ -29,7 +36,22 @@ _rng = random.Random(7)
 def _load():
     global _events_df
     if _events_df is None:
-        _events_df = pd.read_parquet(SEED_PATH)
+        if os.path.exists(REAL_EVENTS_PATH):
+            _events_df = pd.read_parquet(REAL_EVENTS_PATH)
+            source = f"real Olist milestones ({os.path.basename(REAL_EVENTS_PATH)})"
+        elif os.path.exists(SYNTHETIC_EVENTS_PATH):
+            _events_df = pd.read_parquet(SYNTHETIC_EVENTS_PATH)
+            source = f"synthetic fallback ({os.path.basename(SYNTHETIC_EVENTS_PATH)})"
+        else:
+            raise FileNotFoundError(
+                "No tracking-event data found. Run "
+                "`python -m src.ingestion.download_olist` (real events) or "
+                "`python -m src.ingestion.generate_seed_dataset` (fallback).")
+        # Timestamps must be JSON-serialisable for the API response.
+        if "event_timestamp" in _events_df.columns:
+            _events_df["event_timestamp"] = (
+                pd.to_datetime(_events_df["event_timestamp"]).astype(str))
+        print(f"[shipping_api] serving {len(_events_df):,} events from {source}")
     return _events_df
 
 
@@ -67,10 +89,21 @@ def shipment_events():
 
 @app.route("/api/v1/carriers/performance", methods=["GET"])
 def carrier_performance():
+    """On-time rate per carrier, derived from the served events.
+
+    Handles both event vocabularies: the synthetic feed marks a dedicated
+    DELAYED event, whereas the real Olist milestones record lateness on the
+    delivery event's delay_reason.
+    """
     df = _load()
-    delayed = df[df["event_type"] == "DELAYED"].groupby("carrier").size()
+    if (df["event_type"] == "DELAYED").any():
+        late = df[df["event_type"] == "DELAYED"]
+    else:
+        late = df[df["delay_reason"].astype(str).str.contains("Late", case=False, na=False)]
+
+    late_counts = late.groupby("carrier").size()
     total = df.groupby("carrier").size()
-    perf = (1 - (delayed / total).fillna(0)).round(4)
+    perf = (1 - (late_counts.reindex(total.index).fillna(0) / total)).round(4)
     return jsonify(perf.to_dict())
 
 

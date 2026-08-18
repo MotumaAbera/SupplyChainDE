@@ -6,7 +6,7 @@ constraint forced a compromise.
 
 ---
 
-## 1. Two ingestion sources: flat file + live REST API
+## 1. Two ingestion sources: real files + a live REST API
 
 **Decision.** Source #1 is an order-level CSV. Source #2 is a Flask service
 (`src/ingestion/shipping_api_server.py`) that serves shipment tracking events
@@ -19,7 +19,7 @@ satisfy "≥2 sources" literally.
 nothing about integration. The simulated carrier API deliberately reproduces
 the failure modes of a real third-party vendor:
 
-- **pagination** — 500 rows/page, so the extractor must loop (377 pages)
+- **pagination** — 500 rows/page, so the extractor must loop (894 pages)
 - **transient 503s** — 1% of requests fail, forcing retry-with-backoff
 - **rate-limit headers** — `X-RateLimit-Remaining` on every response
 
@@ -44,7 +44,7 @@ choice matters:
 
 The cleaning stage reads from SQLite (it needs relational access across
 orders and events); Spark reads Parquet (it needs efficient columnar scans of
-103k rows). Neither format is decorative.
+292,867 rows). Neither format is decorative.
 
 ---
 
@@ -79,8 +79,8 @@ which is **salted per interpreter process** (`PYTHONHASHSEED`). The split was
 documented as deterministic but silently produced different train/test sizes
 on every run — 82,745 rows one run, 82,747 the next. `hashlib.md5` is stable
 across processes and machines, so a given `order_id` always lands in the same
-side of the split. Verified: two consecutive runs now both yield
-82,851 / 20,697.
+side of the split. Verified by re-running: the split is now identical every
+time (currently 234,392 / 58,475).
 
 Hash-based splitting was chosen over `train_test_split(random_state=...)`
 because it is stable under *data growth*: adding new orders does not reshuffle
@@ -123,7 +123,7 @@ producing an empty dataset.
 
 ---
 
-## 7. Spark in local mode, despite a 103k-row dataset
+## 7. Spark in local mode, despite a 293k-row dataset
 
 **Decision.** PySpark runs `local[*]` over data that fits comfortably in
 pandas.
@@ -136,7 +136,7 @@ ones that would not change shape at 100× the data. The code is the
 deliverable, not the runtime.
 
 Polars covers the case where speed at this scale genuinely matters — it writes
-the ~100k-row flat CSV export several times faster than pandas.
+the ~293k-row flat CSV export several times faster than pandas.
 
 ---
 
@@ -162,7 +162,7 @@ wrappers that call each stage's `main()`.
 **Decision.** Every stage reads from disk, writes to disk, and can be re-run
 safely. Tasks pass data through Parquet files rather than Airflow XCom.
 
-**Reasoning.** XCom is designed for small metadata, not 100k-row frames;
+**Reasoning.** XCom is designed for small metadata, not 293k-row frames;
 pushing dataframes through it would serialise them into the metadata database.
 File handoff keeps each stage independently runnable — essential for
 debugging, and what makes Airflow's automatic retries safe. A retried task
@@ -171,7 +171,7 @@ never leaves a half-written state that the next attempt would compound.
 
 ---
 
-## 10. Real Kaggle data, with four derived columns
+## 10. Source #1: real Kaggle data (DataCo)
 
 **Decision.** Source #1 is the **DataCo Smart Supply Chain** dataset from
 Kaggle (`shashwatwork/dataco-smart-supply-chain-for-big-data-analysis`) —
@@ -203,19 +203,9 @@ from two genuine source columns, giving a real class balance of **57.3%
 delayed** rather than an invented one. The geospatial columns are real too,
 which matters for Topic 9's route/coordinate requirements.
 
-**Four columns are derived, not real,** because the source does not carry
-them — this is stated plainly rather than buried:
-
-- `weight_kg` — derived from quantity
-- `distance_km` — synthesised
-- `shipping_cost` — derived from distance and weight
-- `carrier` — synthesised from the six-carrier value set
-
-The dataset has `Shipping Mode` but no carrier field. Features that depend on
-these four (`shipping_cost_per_unit`, `route_efficiency_score`,
-`carrier_performance_score`) are therefore computed over partly-derived
-inputs. Everything driven by delivery days, dates, categories, geography and
-price is real.
+**DataCo does not carry** `weight_kg`, `distance_km`, `shipping_cost` or a
+named `carrier`. Rather than fabricate them, a **second real dataset** was
+added that does — see §11.
 
 **`order_id` is renumbered.** The source is order-*item* level, so `Order Id`
 repeats across line items (114,767 duplicates). Since the expectation suite
@@ -235,3 +225,77 @@ runs identically either way and no downstream stage changes.
 `promised_delivery_days >= 1`. Real data legitimately contains 0 — the
 "Same Day" shipping mode. The bound was relaxed to 0 rather than clipping the
 data, because the data is correct and the assumption was wrong.
+
+---
+
+## 11. A second real dataset instead of fabricated columns
+
+**Decision.** Olist Brazilian E-Commerce
+(`olistbr/brazilian-ecommerce`) was added as a second real source —
+**112,650 order items across 7 joined tables** — and unioned with DataCo into
+the shared schema. Total: **292,867 rows**.
+
+**Reasoning.** DataCo lacks shipping cost, package weight, distance and a
+named carrier. The original build invented all four. That is the weakest thing
+you can do in a data pipeline: the numbers look plausible, flow through every
+downstream feature, and are indistinguishable from real values in the output.
+Olist carries exactly those fields for real:
+
+| Column | Olist source | Real? |
+|---|---|---|
+| `shipping_cost` | `freight_value` — actual per-item freight charge | **yes** |
+| `weight_kg` | `product_weight_g` from the product catalogue | **yes** |
+| `distance_km` | haversine between the seller's and customer's postcode coordinates | **yes** |
+| `promised_delivery_days` | `order_estimated_delivery_date` − purchase | **yes** |
+| `actual_delivery_days` | `order_delivered_customer_date` − purchase | **yes** |
+
+The distance is worth dwelling on. Olist publishes a 1,000,163-row
+geolocation table keyed by postcode prefix, and both the seller and the
+customer carry a postcode. Averaging each prefix to a point and taking the
+great-circle distance between the two ends gives a **genuine geodesic** —
+mean 597 km, max 8,678 km, which is the right scale for Brazil. Nothing is
+guessed.
+
+**Why union rather than join.** The two datasets describe different orders and
+share no key. Joining them would be fabrication. Stacking them is the honest
+operation, and it is also the more realistic engineering problem: reconciling
+two heterogeneous real feeds into one canonical schema is what an ingestion
+layer actually does. Every row carries `source_system` (`dataco` | `olist`),
+and an expectation asserts that column's domain, so **per-row lineage is
+auditable** rather than implied.
+
+**What each source contributes.** The two are complementary — every schema
+column is real in at least one source:
+
+| | DataCo | Olist |
+|---|---|---|
+| rows | 180,519 | 112,348 |
+| delivery days | real | real |
+| coordinates | destination only | **both ends** |
+| shipping cost | derived | **real** (mean 19.98) |
+| weight | derived | **real** |
+| distance | derived | **real** (mean 597 km) |
+| discount rate | **real** | not present (0.0) |
+| shipping mode | **real** | inferred from its own lead time |
+| carrier | 6 synthetic names | 3,095 **real** sellers as fulfilment party |
+
+The mean delay differs sharply by source — DataCo +0.57 days (57.3% late),
+Olist −11.50 days (7.3% late, because Olist's estimated dates are
+deliberately conservative). That is a real property of the two businesses, not
+an artefact, and `source_system` lets any model or analysis condition on it.
+
+**Source #2 became real too.** The simulated carrier API now serves **446,937
+real delivery milestones** extracted from Olist's four genuine timestamps —
+order placed, payment approved, handed to carrier, delivered — instead of
+generated events. The API keeps its realistic transport behaviour
+(pagination over 894 pages, transient 503s, rate-limit headers), so the
+integration logic is still exercised, but the payload is now real recorded
+data. The synthetic generator remains only as an offline fallback.
+
+**Remaining honesty note.** Olist names no carrier; it identifies the seller
+who fulfils each order, and records the handover in
+`order_delivered_carrier_date`. `carrier` is therefore populated from the real
+seller identifier, and `carrier_performance_score` becomes a real per-shipper
+on-time rate. DataCo's six carrier names remain synthetic — the one field in
+the project still without a real basis, and the reason the fixed-carrier
+value-set expectation was replaced by the `source_system` provenance check.

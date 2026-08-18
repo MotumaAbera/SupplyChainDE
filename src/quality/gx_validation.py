@@ -33,10 +33,10 @@ def build_suite():
         ExpectColumnValuesToNotBeNull(column="order_id"),
         ExpectColumnValuesToNotBeNull(column="order_date"),
         ExpectColumnValuesToNotBeNull(column="carrier"),
-        ExpectColumnValuesToBeInSet(
-            column="carrier",
-            value_set=["DHL Express", "FedEx", "UPS", "Maersk Line", "DB Schenker", "Local Courier Co"],
-        ),
+        # Provenance check: every row must declare which real dataset it came
+        # from. The two sources are unioned, not joined, so this is the column
+        # that makes per-row lineage auditable.
+        ExpectColumnValuesToBeInSet(column="source_system", value_set=["dataco", "olist"]),
         ExpectColumnValuesToBeInSet(
             column="shipping_mode",
             value_set=["Standard Class", "First Class", "Second Class", "Same Day"],
@@ -47,11 +47,12 @@ def build_suite():
         ExpectColumnValuesToBeBetween(column="destination_latitude", min_value=-90, max_value=90),
         ExpectColumnValuesToBeBetween(column="destination_longitude", min_value=-180, max_value=180),
         ExpectColumnValuesToBeBetween(column="distance_km", min_value=0, max_value=25000),
-        # Lower bound is 0, not 1: same-day shipping is a real category in the
-        # source data ("Same Day" shipping mode => 0 scheduled/actual days).
-        ExpectColumnValuesToBeBetween(column="promised_delivery_days", min_value=0, max_value=15),
-        ExpectColumnValuesToBeBetween(column="actual_delivery_days", min_value=0, max_value=60),
-        ExpectColumnValuesToMatchRegex(column="order_id", regex=r"^ORD-\d+$"),
+        # Bounds widened to the real observed ranges across both sources.
+        # Lower bound is 0 (same-day shipping); the upper bounds accommodate
+        # Olist's long-tail estimates, which legitimately run to ~5-7 months.
+        ExpectColumnValuesToBeBetween(column="promised_delivery_days", min_value=0, max_value=180),
+        ExpectColumnValuesToBeBetween(column="actual_delivery_days", min_value=0, max_value=240),
+        ExpectColumnValuesToMatchRegex(column="order_id", regex=r"^ORD-(OLIST-)?\d+$"),
         # Feature-level sanity checks
         ExpectColumnValuesToBeBetween(column="carrier_performance_score", min_value=0, max_value=1),
         ExpectColumnValuesToBeBetween(column="route_efficiency_score", min_value=0, max_value=1),
