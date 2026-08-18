@@ -8,13 +8,21 @@ data/raw/kaggle_supply_chain_orders.csv. No other pipeline stage changes.
 
 Credentials
 -----------
-Either export the API token as environment variables:
+Generate a token at https://www.kaggle.com/settings/api ("Create New Token")
+and export it:
+
+    export KAGGLE_API_TOKEN=KGAT_xxxxxxxxxxxx
+
+Current-generation tokens (the `KGAT_...` form) use KAGGLE_API_TOKEN and need
+no username. The legacy username+key pair is still supported:
 
     export KAGGLE_USERNAME=<your-username>
     export KAGGLE_KEY=<your-key>
 
-or place the kaggle.json you download from your Kaggle account page at
-~/.kaggle/kaggle.json (Windows: %USERPROFILE%\\.kaggle\\kaggle.json).
+Token files are read too: ~/.kaggle/access_token (new) or
+~/.kaggle/kaggle.json (legacy).
+
+Never commit a token. Keep it in the environment, not in the repo.
 
 Usage
 -----
@@ -60,7 +68,10 @@ TARGET_COLUMNS = [
 # Candidate source column names -> our schema. Lower-cased, non-alphanumeric
 # stripped, so "Order Date", "order_date" and "ORDER-DATE" all match.
 COLUMN_ALIASES = {
-    "order_id": ["orderid", "ordernumber", "orderitemid", "id", "skuid", "sku"],
+    # "Order Item Id" is preferred over "Order Id": this dataset is
+    # order-*item* level, so only the item id is a unique row key and the
+    # expectation suite requires order_id to be unique.
+    "order_id": ["orderitemid", "orderid", "ordernumber", "id", "skuid", "sku"],
     "order_date": ["orderdate", "date", "orderdatedateorders", "shipdate"],
     "customer_id": ["customerid", "custid", "customer"],
     "customer_segment": ["customersegment", "segment", "customertype"],
@@ -70,11 +81,14 @@ COLUMN_ALIASES = {
     "unit_price": ["unitprice", "productprice", "price", "orderitemproductprice"],
     "discount_rate": ["discountrate", "orderitemdiscountrate", "discount"],
     "weight_kg": ["weightkg", "weight", "productweight", "shippingweight"],
-    "origin_warehouse_id": ["originwarehouseid", "warehouseid", "location", "originlocation"],
-    "origin_region": ["originregion", "region", "market"],
-    "destination_city": ["destinationcity", "customercity", "city"],
-    "destination_country": ["destinationcountry", "customercountry", "country", "ordercountry"],
-    "destination_region": ["destinationregion", "customerregion", "ordertregion", "orderregion"],
+    "origin_warehouse_id": ["originwarehouseid", "warehouseid", "departmentid",
+                            "departmentname", "location", "originlocation"],
+    "origin_region": ["originregion", "market", "region"],
+    # Prefer the *order* location (where it ships to) over the customer's
+    # registered address.
+    "destination_city": ["destinationcity", "ordercity", "customercity", "city"],
+    "destination_country": ["destinationcountry", "ordercountry", "customercountry", "country"],
+    "destination_region": ["destinationregion", "orderregion", "customerregion", "orderstate"],
     "destination_latitude": ["destinationlatitude", "latitude", "lat", "customerlat"],
     "destination_longitude": ["destinationlongitude", "longitude", "lon", "lng", "customerlong"],
     "distance_km": ["distancekm", "distance", "shippingdistance"],
@@ -83,8 +97,10 @@ COLUMN_ALIASES = {
     "promised_delivery_days": ["promiseddeliverydays", "daysforshipmentscheduled", "scheduledshippingdays", "promiseddays"],
     "actual_delivery_days": ["actualdeliverydays", "daysforshippingreal", "realshippingdays", "shippingtimes", "actualdays"],
     "shipping_cost": ["shippingcost", "shippingcosts", "freightcost", "costs"],
-    "order_status": ["orderstatus", "status", "deliverystatus"],
-    "delay_reason": ["delayreason", "latedeliveryrisk", "reason"],
+    "order_status": ["orderstatus", "status"],
+    # "Delivery Status" (Late delivery / Shipping on time / ...) is the closest
+    # real analogue of a delay reason.
+    "delay_reason": ["delayreason", "deliverystatus", "latedeliveryrisk", "reason"],
 }
 
 
@@ -94,11 +110,17 @@ def _norm(name: str) -> str:
 
 def download(dataset: str) -> str:
     """Download and unzip a Kaggle dataset. Returns the extraction directory."""
-    if not (os.environ.get("KAGGLE_KEY") or
-            os.path.exists(os.path.expanduser("~/.kaggle/kaggle.json"))):
+    has_credentials = any([
+        os.environ.get("KAGGLE_API_TOKEN"),                              # newer KGAT_ token
+        os.environ.get("KAGGLE_KEY"),                                    # legacy username+key
+        os.path.exists(os.path.expanduser("~/.kaggle/kaggle.json")),     # legacy file
+        os.path.exists(os.path.expanduser("~/.kaggle/access_token")),    # newer token file
+    ])
+    if not has_credentials:
         raise RuntimeError(
-            "No Kaggle credentials found. Set KAGGLE_USERNAME and KAGGLE_KEY, "
-            "or place kaggle.json in ~/.kaggle/ . See this module's docstring."
+            "No Kaggle credentials found. Set KAGGLE_API_TOKEN (token from "
+            "kaggle.com/settings/api), or the legacy KAGGLE_USERNAME + "
+            "KAGGLE_KEY pair. See this module's docstring."
         )
 
     # Imported lazily so the rest of the module works without the package.
@@ -169,17 +191,22 @@ def map_to_schema(df: pd.DataFrame, rng_seed: int = 42) -> pd.DataFrame:
         print(f"[kaggle] not present in source, filled below: {missing}")
 
     # --- Derivations for anything still missing -------------------------
+    # order_id must be unique and match ^ORD-\d+$ (expectation suite), so the
+    # source id is renumbered into that form rather than passed through.
     if out["order_id"].isna().all():
         out["order_id"] = [f"ORD-{i:07d}" for i in range(1, len(out) + 1)]
     else:
-        # Guarantee uniqueness: the suite expects order_id to be a key.
-        dupes = out["order_id"].duplicated(keep=False)
-        if dupes.any():
-            print(f"[kaggle] order_id had {int(dupes.sum()):,} duplicates -> suffixing")
-            out["order_id"] = (
-                out["order_id"].astype(str) + "-" +
-                out.groupby(out["order_id"]).cumcount().astype(str)
-            )
+        source_ids = out["order_id"].astype(str)
+        dupes = int(source_ids.duplicated().sum())
+        if dupes:
+            print(f"[kaggle] source order id has {dupes:,} duplicate(s) "
+                  f"-> renumbering sequentially to keep order_id unique")
+            out["order_id"] = [f"ORD-{i:07d}" for i in range(1, len(out) + 1)]
+        else:
+            digits = source_ids.str.replace(r"\D", "", regex=True)
+            digits = digits.where(digits.str.len() > 0,
+                                  pd.Series(range(1, len(out) + 1), index=out.index).astype(str))
+            out["order_id"] = "ORD-" + digits
 
     if out["order_date"].isna().all():
         raise RuntimeError(

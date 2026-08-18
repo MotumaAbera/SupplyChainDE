@@ -80,15 +80,32 @@ export KAGGLE_KEY=<your-key>
 …or save the downloaded `kaggle.json` to `~/.kaggle/kaggle.json`
 (Windows: `%USERPROFILE%\.kaggle\kaggle.json`).
 
-Then download and map it onto the pipeline schema in one step:
+Then download and map it onto the pipeline schema:
 
 ```bash
-python -m src.ingestion.download_kaggle
-python -m src.ingestion.download_kaggle --dataset owner/dataset-name   # any other dataset
+# The dataset this project was built against: DataCo Smart Supply Chain,
+# 180,519 rows x 53 columns.
+python -m src.ingestion.download_kaggle \
+    --dataset shashwatwork/dataco-smart-supply-chain-for-big-data-analysis
+
+# ...or any other supply-chain dataset:
+python -m src.ingestion.download_kaggle --dataset owner/dataset-name
 ```
 
 This writes `data/raw/kaggle_supply_chain_orders.csv` in the schema documented
-in `docs/data_dictionary.md`. **No other pipeline stage changes.**
+in `docs/data_dictionary.md`, reporting which columns mapped directly and which
+had to be derived (21/25 map directly for DataCo).
+
+**Then re-key Source #2 to the imported orders:**
+
+```bash
+python -m src.ingestion.generate_seed_dataset --events-only
+```
+
+The simulated carrier API serves tracking events joined on `order_id`. Events
+built against a different orders file would join to nothing, so this step is
+required after importing (or re-importing) Source #1. **No other pipeline stage
+changes.**
 
 The mapper normalises column names (case and punctuation insensitive) against
 an alias table in `download_kaggle.py`, so common Kaggle supply-chain namings

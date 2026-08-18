@@ -47,8 +47,10 @@ def build_suite():
         ExpectColumnValuesToBeBetween(column="destination_latitude", min_value=-90, max_value=90),
         ExpectColumnValuesToBeBetween(column="destination_longitude", min_value=-180, max_value=180),
         ExpectColumnValuesToBeBetween(column="distance_km", min_value=0, max_value=25000),
-        ExpectColumnValuesToBeBetween(column="promised_delivery_days", min_value=1, max_value=15),
-        ExpectColumnValuesToBeBetween(column="actual_delivery_days", min_value=1, max_value=60),
+        # Lower bound is 0, not 1: same-day shipping is a real category in the
+        # source data ("Same Day" shipping mode => 0 scheduled/actual days).
+        ExpectColumnValuesToBeBetween(column="promised_delivery_days", min_value=0, max_value=15),
+        ExpectColumnValuesToBeBetween(column="actual_delivery_days", min_value=0, max_value=60),
         ExpectColumnValuesToMatchRegex(column="order_id", regex=r"^ORD-\d+$"),
         # Feature-level sanity checks
         ExpectColumnValuesToBeBetween(column="carrier_performance_score", min_value=0, max_value=1),

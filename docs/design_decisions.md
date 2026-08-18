@@ -171,19 +171,67 @@ never leaves a half-written state that the next attempt would compound.
 
 ---
 
-## 10. Synthetic data as a documented fallback
+## 10. Real Kaggle data, with four derived columns
 
-**Decision.** `generate_seed_dataset.py` produces a seeded, schema-faithful
-synthetic dataset; `download_kaggle.py` swaps in the real Kaggle data.
+**Decision.** Source #1 is the **DataCo Smart Supply Chain** dataset from
+Kaggle (`shashwatwork/dataco-smart-supply-chain-for-big-data-analysis`) —
+**180,519 rows × 53 columns**, fetched by `src/ingestion/download_kaggle.py`.
 
-**Reasoning.** The original build environment had no Kaggle API access, and a
-pipeline with no data cannot be developed at all. The synthetic generator is
-seeded (`seed=42`) so the dataset is reproducible, and matches the real
-schema exactly so no downstream stage needs to change when the real data
-arrives.
+**Provenance of every field.** 21 of the 25 schema columns map directly from
+the source:
 
-This is a compromise, and it is flagged rather than hidden: the assessment
-asks for a real research dataset, so `download_kaggle.py` exists to fetch one
-and map its columns onto this schema. The alias table in that module handles
-the common Kaggle supply-chain column namings; anything the source genuinely
-lacks is either derived or left null for the cleaning stage to handle.
+| Schema column | Source column |
+|---|---|
+| `order_date` | `order date (DateOrders)` |
+| `promised_delivery_days` | `Days for shipment (scheduled)` |
+| `actual_delivery_days` | `Days for shipping (real)` |
+| `product_category` | `Category Name` |
+| `quantity` | `Order Item Quantity` |
+| `unit_price` | `Product Price` |
+| `discount_rate` | `Order Item Discount Rate` |
+| `destination_latitude/longitude` | `Latitude` / `Longitude` |
+| `destination_city/country/region` | `Order City` / `Order Country` / `Order Region` |
+| `shipping_mode` | `Shipping Mode` |
+| `order_status` | `Order Status` |
+| `delay_reason` | `Delivery Status` |
+| `customer_id`, `customer_segment` | `Customer Id`, `Customer Segment` |
+| `product_id` | `Product Card Id` |
+| `origin_warehouse_id`, `origin_region` | `Department Id`, `Market` |
+
+Critically, **the target is real**: `delivery_delay = actual − promised` comes
+from two genuine source columns, giving a real class balance of **57.3%
+delayed** rather than an invented one. The geospatial columns are real too,
+which matters for Topic 9's route/coordinate requirements.
+
+**Four columns are derived, not real,** because the source does not carry
+them — this is stated plainly rather than buried:
+
+- `weight_kg` — derived from quantity
+- `distance_km` — synthesised
+- `shipping_cost` — derived from distance and weight
+- `carrier` — synthesised from the six-carrier value set
+
+The dataset has `Shipping Mode` but no carrier field. Features that depend on
+these four (`shipping_cost_per_unit`, `route_efficiency_score`,
+`carrier_performance_score`) are therefore computed over partly-derived
+inputs. Everything driven by delivery days, dates, categories, geography and
+price is real.
+
+**`order_id` is renumbered.** The source is order-*item* level, so `Order Id`
+repeats across line items (114,767 duplicates). Since the expectation suite
+requires a unique key matching `^ORD-\d+$`, rows are renumbered sequentially.
+
+**Source #2 is regenerated from Source #1.** The simulated carrier API serves
+events joined on `order_id`, so events built against the old synthetic ids
+would join to nothing. `generate_seed_dataset.py --events-only` rebuilds them
+from whichever orders file is in place — verified at a **100% join rate**
+(60,000/60,000 sampled orders).
+
+**The synthetic generator is retained as a fallback** for anyone without a
+Kaggle token. It is seeded (`seed=42`) and schema-faithful, so the pipeline
+runs identically either way and no downstream stage changes.
+
+**Expectation adjusted for real data.** The suite originally required
+`promised_delivery_days >= 1`. Real data legitimately contains 0 — the
+"Same Day" shipping mode. The bound was relaxed to 0 rather than clipping the
+data, because the data is correct and the assumption was wrong.

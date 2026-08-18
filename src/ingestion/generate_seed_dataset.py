@@ -211,6 +211,39 @@ def build_shipping_events(orders_df):
     return pd.DataFrame(events)
 
 
+def build_events_only(orders_csv=None, sample_size=60000):
+    """Regenerate only the tracking events, keyed to an existing orders CSV.
+
+    Source #2 (the simulated carrier API) serves events joined to orders on
+    order_id. When Source #1 is the real Kaggle dataset, events generated
+    against the *synthetic* order ids would not join to anything, so the
+    events must be rebuilt from whichever orders file is actually in place.
+    """
+    if orders_csv is None:
+        orders_csv = os.path.join(RAW_DIR, "kaggle_supply_chain_orders.csv")
+    orders_df = pd.read_csv(orders_csv, low_memory=False)
+    print(f"Building tracking events from {len(orders_df):,} orders in "
+          f"{os.path.basename(orders_csv)} ...")
+
+    # build_shipping_events needs these columns; fill any the source lacks.
+    for col, default in [("carrier", "Local Courier Co"),
+                         ("destination_city", "Unknown"),
+                         ("delay_reason", "None")]:
+        if col not in orders_df.columns:
+            orders_df[col] = default
+        else:
+            orders_df[col] = orders_df[col].fillna(default)
+
+    sample = orders_df.sample(n=min(sample_size, len(orders_df)),
+                              random_state=RANDOM_SEED)
+    events_df = build_shipping_events(sample)
+    os.makedirs(SEED_DIR, exist_ok=True)
+    events_out = os.path.join(SEED_DIR, "shipping_events_seed.parquet")
+    events_df.to_parquet(events_out, index=False)
+    print(f"  -> wrote {len(events_df):,} tracking events to {events_out}")
+    return events_df
+
+
 def main():
     print(f"Generating {N_ORDERS:,} synthetic supply-chain orders (seed={RANDOM_SEED})...")
     orders_df = build_orders()
@@ -226,4 +259,18 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--events-only", action="store_true",
+        help="Rebuild only the API's tracking events, keyed to the orders CSV "
+             "already in data/raw/ (use after importing the real Kaggle data).")
+    parser.add_argument("--orders-csv", default=None,
+                        help="Orders CSV to key the events to.")
+    args = parser.parse_args()
+
+    if args.events_only:
+        build_events_only(args.orders_csv)
+    else:
+        main()

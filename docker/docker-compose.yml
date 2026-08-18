@@ -9,6 +9,12 @@
 # Both services mount the repo at /opt/project, so the DAG executes the same
 # src/ modules the native pipeline uses and writes back into the host's data/
 # and docs/ directories.
+#
+# Run only ONE of them at a time. They write the same data/ files, and two
+# concurrent runs collide on the SQLite raw store ("database is locked"). If
+# airflow-standalone is up with the DAG unpaused, its scheduler may start a
+# scheduled run on its own -- pause the DAG in the UI, or stop the service,
+# before using airflow-test.
 
 x-common: &common
   build:
@@ -22,13 +28,20 @@ x-common: &common
     PYTHONPATH: /opt/project
   volumes:
     - ..:/opt/project
-    - airflow-db:/opt/airflow
 
 services:
   # Synchronous single run. Exits non-zero if any task fails.
+  #
+  # Uses its OWN metadata volume, separate from airflow-standalone. Sharing one
+  # would let the standalone scheduler pick up this run's queued tasks and
+  # execute them concurrently -- two processes writing the same bind-mounted
+  # SQLite file, which fails with "database is locked".
   airflow-test:
     <<: *common
     entrypoint: ["/bin/bash", "/opt/project/docker/run_dag_test.sh"]
+    volumes:
+      - ..:/opt/project
+      - airflow-db-test:/opt/airflow
 
   # Scheduler + webserver + UI.
   airflow-standalone:
@@ -54,8 +67,12 @@ services:
       AIRFLOW__CORE__DAGS_FOLDER: /opt/project/dags
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: sqlite:////opt/airflow/airflow.db
       PYTHONPATH: /opt/project
+    volumes:
+      - ..:/opt/project
+      - airflow-db:/opt/airflow
     ports:
       - "8080:8080"
 
 volumes:
-  airflow-db:
+  airflow-db:        # airflow-standalone (UI)
+  airflow-db-test:   # airflow-test (one-off runs)
