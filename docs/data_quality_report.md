@@ -1,6 +1,6 @@
 # Data Quality Report — Great Expectations
 
-Run at: 2026-08-18T07:16:43.718647+00:00
+Run at: 2026-08-18T07:22:43.522881+00:00
 
 - Dataset: `orders_featured.parquet` (103,548 rows, 36 columns)
 - Expectations run: **21**
