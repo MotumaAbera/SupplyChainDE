@@ -2,7 +2,12 @@
 SQLite (data/raw/supply_chain_raw.db) and Parquet (data/raw/parquet/)."""
 import os
 import sqlite3
+import sys
 import pandas as pd
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+
+from src.utils.parquet_io import write_parquet
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data")
 RAW_DIR = os.path.join(DATA_DIR, "raw")
@@ -25,9 +30,9 @@ def store_raw(orders_df: pd.DataFrame, events_df: pd.DataFrame, carrier_perf_df:
           f"-> {SQLITE_PATH}")
 
     # --- Parquet ---
-    orders_df.to_parquet(os.path.join(PARQUET_DIR, "orders_raw.parquet"), index=False)
-    events_df.to_parquet(os.path.join(PARQUET_DIR, "shipping_events_raw.parquet"), index=False)
-    carrier_perf_df.to_parquet(os.path.join(PARQUET_DIR, "carrier_performance_raw.parquet"), index=False)
+    write_parquet(orders_df, os.path.join(PARQUET_DIR, "orders_raw.parquet"))
+    write_parquet(events_df, os.path.join(PARQUET_DIR, "shipping_events_raw.parquet"))
+    write_parquet(carrier_perf_df, os.path.join(PARQUET_DIR, "carrier_performance_raw.parquet"))
     print(f"[raw_storage] Parquet files written to {PARQUET_DIR}")
 
 

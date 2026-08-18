@@ -15,6 +15,8 @@ import pandas as pd
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
+from src.utils.parquet_io import write_parquet
+
 PROCESSED_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "processed")
 os.makedirs(PROCESSED_DIR, exist_ok=True)
 
@@ -88,8 +90,8 @@ def main():
     orders_clean, stats = clean_orders(orders_raw)
     events_clean = clean_events(events_raw)
 
-    orders_clean.to_parquet(os.path.join(PROCESSED_DIR, "orders_clean.parquet"), index=False)
-    events_clean.to_parquet(os.path.join(PROCESSED_DIR, "events_clean.parquet"), index=False)
+    write_parquet(orders_clean, os.path.join(PROCESSED_DIR, "orders_clean.parquet"))
+    write_parquet(events_clean, os.path.join(PROCESSED_DIR, "events_clean.parquet"))
 
     print("[clean] Cleaning summary:")
     for k, v in stats.items():

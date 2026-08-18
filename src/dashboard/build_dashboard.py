@@ -93,7 +93,7 @@ def main():
 
     html = _render_html(data)
     out_path = os.path.join(DASHBOARD_DIR, "supply_chain_dashboard.html")
-    with open(out_path, "w") as f:
+    with open(out_path, "w", encoding="utf-8") as f:
         f.write(html)
     print(f"[dashboard] wrote {out_path}")
     return out_path
@@ -104,7 +104,7 @@ def _plotly_js_tag() -> str:
     dashboard is fully self-contained and works offline / without CDN access."""
     import plotly
     js_path = os.path.join(os.path.dirname(plotly.__file__), "package_data", "plotly.min.js")
-    with open(js_path, "r") as f:
+    with open(js_path, "r", encoding="utf-8") as f:
         js = f.read()
     return f"<script>{js}</script>"
 

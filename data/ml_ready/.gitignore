@@ -1,2 +1,4 @@
 /train.parquet
 /test.parquet
+# Derived convenience export (~20 MB); regenerate with build_ml_dataset.
+/supply_chain_ml_ready.csv

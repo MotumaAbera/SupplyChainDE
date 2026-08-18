@@ -52,9 +52,10 @@ def _extract_sources(**_):
     orders = extract_orders_csv()
     events = extract_shipping_events()
     perf = extract_carrier_performance()
-    orders.to_parquet(os.path.join(PROJECT_ROOT, "data", "raw", "_tmp_orders.parquet"), index=False)
-    events.to_parquet(os.path.join(PROJECT_ROOT, "data", "raw", "_tmp_events.parquet"), index=False)
-    perf.to_parquet(os.path.join(PROJECT_ROOT, "data", "raw", "_tmp_perf.parquet"), index=False)
+    from src.utils.parquet_io import write_parquet
+    write_parquet(orders, os.path.join(PROJECT_ROOT, "data", "raw", "_tmp_orders.parquet"))
+    write_parquet(events, os.path.join(PROJECT_ROOT, "data", "raw", "_tmp_events.parquet"))
+    write_parquet(perf, os.path.join(PROJECT_ROOT, "data", "raw", "_tmp_perf.parquet"))
     if len(orders) == 0:
         raise ValueError("extract_sources: orders extract returned 0 rows -- aborting pipeline")
 

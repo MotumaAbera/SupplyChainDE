@@ -17,8 +17,13 @@ Each feature's rationale is documented inline and mirrored in the data
 dictionary (docs/data_dictionary.md).
 """
 import os
+import sys
 import numpy as np
 import pandas as pd
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+
+from src.utils.parquet_io import write_parquet
 
 PROCESSED_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "processed")
 
@@ -131,7 +136,7 @@ def main():
     events = pd.read_parquet(os.path.join(PROCESSED_DIR, "events_clean.parquet"))
     featured = engineer_features(orders, events)
     out_path = os.path.join(PROCESSED_DIR, "orders_featured.parquet")
-    featured.to_parquet(out_path, index=False)
+    write_parquet(featured, out_path)
 
     new_feature_cols = [
         "delivery_delay", "is_delayed", "shipping_cost_per_unit", "route_efficiency_score",

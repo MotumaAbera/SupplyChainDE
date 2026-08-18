@@ -7,9 +7,44 @@ ML-ready output + dashboard.
 
 ## 0. Prerequisites
 
-- Python 3.11 (a virtualenv is strongly recommended)
-- Java 17+ (required by PySpark)
+- Python 3.11+ (a virtualenv is strongly recommended; verified on 3.12)
+- Java 17+ (required by PySpark 4.x — **Java 11 will not work**)
 - ~2 GB free disk space
+- Docker Desktop — only needed for the Airflow stage (Section 5)
+
+### 0.1 Windows-specific setup (skip on Linux/macOS)
+
+The pipeline runs fully on native Windows, but three things must be set up
+first. All three fail in confusing ways if skipped.
+
+**a) Point `JAVA_HOME` at a JDK 17+.** PySpark 4.x rejects Java 11, but the
+failure mode is a silent *hang* with no output rather than an error — the JVM
+never starts. Check what you have, then set it (User scope, no admin needed):
+
+```powershell
+[Environment]::GetEnvironmentVariable('JAVA_HOME','User')   # inspect
+[Environment]::SetEnvironmentVariable('JAVA_HOME','C:\Program Files\Java\jdk-17','User')
+```
+
+Restart your terminal/IDE afterwards — running processes keep the old value.
+
+**b) Install Hadoop `winutils`.** Spark can *read* Parquet on Windows without
+it, but *writing* throws `java.io.FileNotFoundException: HADOOP_HOME and
+hadoop.home.dir are unset`. Download `winutils.exe` and `hadoop.dll` for
+Hadoop 3.3.x into `C:\hadoop\bin`:
+
+```powershell
+mkdir C:\hadoop\bin
+curl -L -o C:\hadoop\bin\winutils.exe https://raw.githubusercontent.com/cdarlint/winutils/master/hadoop-3.3.6/bin/winutils.exe
+curl -L -o C:\hadoop\bin\hadoop.dll  https://raw.githubusercontent.com/cdarlint/winutils/master/hadoop-3.3.6/bin/hadoop.dll
+[Environment]::SetEnvironmentVariable('HADOOP_HOME','C:\hadoop','User')
+```
+
+Then add `C:\hadoop\bin` to your `Path`.
+
+**c) Airflow cannot be pip-installed on Windows.** It depends on the
+POSIX-only `pwd`/`fcntl` modules. Use the Docker route in Section 5 instead.
+This is why `apache-airflow` is absent from `requirements.txt`.
 
 ## 1. Environment setup
 
@@ -17,10 +52,13 @@ ML-ready output + dashboard.
 git clone <this-repo> supply-chain-pipeline
 cd supply-chain-pipeline
 python3 -m venv venv
-source venv/bin/activate
+source venv/bin/activate            # Windows: .\venv\Scripts\Activate.ps1
 pip install --upgrade pip setuptools wheel
 pip install -r requirements.txt
 ```
+
+`requirements.txt` is fully pinned to the versions the pipeline was last
+verified against (all stages green, 21/21 quality checks).
 
 > If you hit a `setuptools`/`distutils` build error on packages like
 > `antlr4-python3-runtime` or `unicodecsv` (seen with very new setuptools on
@@ -73,11 +111,40 @@ python -m src.dashboard.build_dashboard  # docs/dashboard/supply_chain_dashboard
 
 ## 5. Run the full pipeline via Apache Airflow (orchestrated)
 
+### 5a. With Docker (required on Windows, works everywhere)
+
+Airflow cannot be pip-installed on native Windows, so the orchestration layer
+runs in a container. The repo is mounted at `/opt/project`, so the DAG executes
+the *same* `src/` modules as the native pipeline and writes its outputs back
+into the host's `data/` and `docs/` directories.
+
 ```bash
+# One-off synchronous run of every task, in dependency order.
+# Exits non-zero if any task fails.
+docker compose -f docker/docker-compose.yml run --rm airflow-test
+
+# OR the full stack with the web UI:
+docker compose -f docker/docker-compose.yml up airflow-standalone
+# open http://localhost:8080, log in as admin / admin,
+# then trigger `supply_chain_logistics_pipeline`
+```
+
+The image (`docker/Dockerfile.airflow`) adds OpenJDK 17 on top of
+`apache/airflow:2.10.5`, because the `spark_processing` task needs a JVM and
+the base image ships without one. The container also starts the simulated
+carrier API on `127.0.0.1:5055` before the DAG runs, since `extract_sources`
+pulls from it.
+
+### 5b. Natively (Linux/macOS only)
+
+```bash
+pip install "apache-airflow==2.10.5"
 export AIRFLOW_HOME=$(pwd)/.airflow
 export AIRFLOW__CORE__DAGS_FOLDER=$(pwd)/dags
 export AIRFLOW__CORE__LOAD_EXAMPLES=False
 airflow db migrate
+
+python -m src.ingestion.shipping_api_server &     # required by extract_sources
 
 # One-off synchronous test run (no scheduler/webserver needed):
 airflow dags test supply_chain_logistics_pipeline $(date +%F)

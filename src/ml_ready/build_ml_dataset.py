@@ -11,8 +11,13 @@ docs/summary_statistics.json for the report/dashboard.
 """
 import json
 import os
+import sys
 import numpy as np
 import pandas as pd
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+
+from src.utils.parquet_io import write_parquet
 
 PROCESSED_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "processed")
 ML_READY_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "ml_ready")
@@ -45,8 +50,8 @@ def main(seed: int = 42):
     train_df = ml_df[~is_test].reset_index(drop=True)
     test_df = ml_df[is_test].reset_index(drop=True)
 
-    train_df.to_parquet(os.path.join(ML_READY_DIR, "train.parquet"), index=False)
-    test_df.to_parquet(os.path.join(ML_READY_DIR, "test.parquet"), index=False)
+    write_parquet(train_df, os.path.join(ML_READY_DIR, "train.parquet"))
+    write_parquet(test_df, os.path.join(ML_READY_DIR, "test.parquet"))
     ml_df.to_csv(os.path.join(ML_READY_DIR, "supply_chain_ml_ready.csv"), index=False)
 
     summary = {

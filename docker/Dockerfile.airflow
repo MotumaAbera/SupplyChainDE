@@ -1,0 +1,39 @@
+# Airflow runtime for the Supply Chain Logistics Pipeline.
+#
+# Airflow cannot be pip-installed on native Windows (it needs the POSIX-only
+# pwd/fcntl modules), so the orchestration layer runs in this container while
+# the pipeline stages themselves are the exact same modules under src/.
+#
+# The base image has no JDK, and the spark_processing task needs one, so we
+# add OpenJDK 17 (PySpark 4.x rejects Java 11).
+FROM apache/airflow:2.10.5-python3.11
+
+USER root
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends openjdk-17-jre-headless procps \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+
+USER airflow
+
+# Pipeline dependencies. Versions are intentionally left to the resolver here
+# rather than using the pinned requirements.txt: that file is pinned for the
+# native Windows venv, and some of those pins (notably pandas 3.x) conflict
+# with what Airflow 2.10 requires. The pipeline code is compatible with both.
+RUN pip install --no-cache-dir \
+        "pyspark==4.2.0" \
+        "great_expectations" \
+        "polars" \
+        "pyarrow" \
+        "flask" \
+        "faker" \
+        "requests" \
+        "matplotlib" \
+        "plotly"
+
+ENV PYTHONPATH=/opt/project
+ENV AIRFLOW__CORE__LOAD_EXAMPLES=False
+ENV AIRFLOW__CORE__DAGS_FOLDER=/opt/project/dags
+WORKDIR /opt/project

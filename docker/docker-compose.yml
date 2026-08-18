@@ -1,0 +1,53 @@
+# Airflow orchestration for the Supply Chain Logistics Pipeline.
+#
+#   One-off end-to-end DAG run (the evidence command):
+#       docker compose -f docker/docker-compose.yml run --rm airflow-test
+#
+#   Full Airflow UI at http://localhost:8080 (login: admin / admin):
+#       docker compose -f docker/docker-compose.yml up airflow-standalone
+#
+# Both services mount the repo at /opt/project, so the DAG executes the same
+# src/ modules the native pipeline uses and writes back into the host's data/
+# and docs/ directories.
+
+x-common: &common
+  build:
+    context: ..
+    dockerfile: docker/Dockerfile.airflow
+  environment:
+    AIRFLOW__CORE__EXECUTOR: SequentialExecutor
+    AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+    AIRFLOW__CORE__DAGS_FOLDER: /opt/project/dags
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: sqlite:////opt/airflow/airflow.db
+    PYTHONPATH: /opt/project
+  volumes:
+    - ..:/opt/project
+    - airflow-db:/opt/airflow
+
+services:
+  # Synchronous single run. Exits non-zero if any task fails.
+  airflow-test:
+    <<: *common
+    entrypoint: ["/bin/bash", "/opt/project/docker/run_dag_test.sh"]
+
+  # Scheduler + webserver + UI.
+  airflow-standalone:
+    <<: *common
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        python -m src.ingestion.shipping_api_server > /tmp/api.log 2>&1 &
+        exec airflow standalone
+    environment:
+      AIRFLOW__CORE__EXECUTOR: SequentialExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/project/dags
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: sqlite:////opt/airflow/airflow.db
+      PYTHONPATH: /opt/project
+      _AIRFLOW_WWW_USER_USERNAME: admin
+      _AIRFLOW_WWW_USER_PASSWORD: admin
+    ports:
+      - "8080:8080"
+
+volumes:
+  airflow-db:
