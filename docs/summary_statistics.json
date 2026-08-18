@@ -1,7 +1,7 @@
 {
   "total_rows": 103548,
-  "train_rows": 82894,
-  "test_rows": 20654,
+  "train_rows": 82851,
+  "test_rows": 20697,
   "n_features": 22,
   "targets": [
     "is_delayed",
@@ -34,8 +34,8 @@
     "Africa": 20599
   },
   "orders_by_category": {
-    "Home & Garden": 10471,
     "Health & Beauty": 10471,
+    "Home & Garden": 10471,
     "Electronics": 10455,
     "Sporting Goods": 10375,
     "Toys": 10360,

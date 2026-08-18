@@ -1,5 +1,5 @@
 outs:
-- md5: 2ccbaeacc68639538b5dc37edf6f97a5
+- md5: c4ade3247a5b9305f5d5d517b39641b2
   size: 36204544
   hash: md5
   path: supply_chain_raw.db

@@ -23,11 +23,13 @@ dvc==3.67.1
 # Dev / notebooks
 jupyter==1.1.1
 
+# Dataset acquisition (Source #1, real Kaggle data)
+kaggle==2.2.4
+
 # Simulated API + misc
-faker==40.36.0
 requests==2.34.2
 flask==3.1.3
 
 # Visualization
-matplotlib==3.11.1
-plotly==6.9.0
+matplotlib==3.11.1   # notebook plots
+plotly==6.9.0        # dashboard

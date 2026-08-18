@@ -67,12 +67,49 @@ verified against (all stages green, 21/21 quality checks).
 
 ## 2. Dataset
 
-**About the data.** This project ships with a large (105K+ row), seeded,
-statistically-realistic synthetic dataset generated to match the exact schema
-and relationships of a real Kaggle supply-chain logistics dataset (see
-`src/utils/reference_data.py` for full provenance notes — live Kaggle access
-was not available in the original build environment). To regenerate it
-identically:
+### 2a. Real Kaggle dataset (preferred)
+
+Get a Kaggle API token from your account page (**Settings → API → Create New
+Token**), then either export it:
+
+```bash
+export KAGGLE_USERNAME=<your-username>
+export KAGGLE_KEY=<your-key>
+```
+
+…or save the downloaded `kaggle.json` to `~/.kaggle/kaggle.json`
+(Windows: `%USERPROFILE%\.kaggle\kaggle.json`).
+
+Then download and map it onto the pipeline schema in one step:
+
+```bash
+python -m src.ingestion.download_kaggle
+python -m src.ingestion.download_kaggle --dataset owner/dataset-name   # any other dataset
+```
+
+This writes `data/raw/kaggle_supply_chain_orders.csv` in the schema documented
+in `docs/data_dictionary.md`. **No other pipeline stage changes.**
+
+The mapper normalises column names (case and punctuation insensitive) against
+an alias table in `download_kaggle.py`, so common Kaggle supply-chain namings
+(`Order Item Quantity`, `Days for shipping (real)`, `Category Name`, …) are
+recognised automatically. Useful flags:
+
+```bash
+python -m src.ingestion.download_kaggle --inspect          # list source columns, map nothing
+python -m src.ingestion.download_kaggle --csv path.csv     # map a local file, skip the download
+python -m src.ingestion.download_kaggle --out /tmp/try.csv # dry run, don't touch the dataset
+```
+
+If a column is missing from the source, the mapper reports it and either
+derives it (e.g. delivery days from two date columns) or leaves it null for the
+cleaning stage to handle. Add any unrecognised source name to `COLUMN_ALIASES`
+and re-run.
+
+### 2b. Synthetic fallback
+
+If you have no Kaggle access, the project can generate a seeded (`seed=42`),
+schema-faithful synthetic dataset with the same 105K+ row shape:
 
 ```bash
 python -m src.ingestion.generate_seed_dataset
@@ -82,12 +119,9 @@ This writes:
 - `data/raw/kaggle_supply_chain_orders.csv` (Source #1 — order-level CSV)
 - `data/seed/shipping_events_seed.parquet` (backing data for Source #2)
 
-**To swap in the real Kaggle dataset instead:** download any Kaggle supply
-chain / logistics orders dataset with a Kaggle API token
-(`kaggle datasets download -d <dataset>`), then map its columns to the schema
-documented in `docs/data_dictionary.md` and save the result to
-`data/raw/kaggle_supply_chain_orders.csv`. No other pipeline code needs to
-change.
+**Note:** `data/seed/shipping_events_seed.parquet` backs the simulated carrier
+API in both modes, so run this at least once even when using real Kaggle data.
+See `docs/design_decisions.md` §10 for why the synthetic fallback exists.
 
 ## 3. Start the simulated shipping-carrier API (Source #2)
 
@@ -171,20 +205,56 @@ run if fewer than 90% of Great Expectations checks pass.
 
 ## 6. Data versioning with DVC
 
+DVC is already initialised and the six datasets are tracked. The default
+remote is a local directory declared **relative to the repo** in `.dvc/config`
+(`../../../dvc_remote_storage`), so it resolves on any machine without editing
+config — no absolute paths.
+
 ```bash
-dvc init                                 # already committed in this repo
-dvc remote add -d localremote /path/to/local/storage   # or S3/GCS/Azure in production
+dvc status                # working data vs. tracked versions
+dvc remote list           # shows the resolved remote path
+dvc push                  # upload tracked data to the remote
+dvc pull                  # fetch it on a fresh clone
+```
+
+To re-track after regenerating the data:
+
+```bash
 dvc add data/raw/kaggle_supply_chain_orders.csv data/raw/supply_chain_raw.db \
         data/processed/orders_clean.parquet data/processed/orders_featured.parquet \
         data/ml_ready/train.parquet data/ml_ready/test.parquet
-git add *.dvc data/**/.gitignore
+git add data/**/*.dvc data/**/.gitignore
 git commit -m "Track pipeline datasets with DVC"
 dvc push
-
-# to retrieve a specific historical version of the data later:
-git checkout <commit-or-tag>
-dvc checkout
 ```
+
+To restore a historical version of the data:
+
+```bash
+git checkout <commit-or-tag>
+dvc checkout                                   # everything
+dvc checkout data/raw/kaggle_supply_chain_orders.csv.dvc --force   # one file
+```
+
+For production you would swap the local remote for cloud storage, which is a
+one-line change:
+
+```bash
+dvc remote add -d s3remote s3://my-bucket/dvc-store   # or gs:// , azure:// ...
+```
+
+## 6b. Exploratory analysis (Jupyter)
+
+`notebooks/01_exploratory_analysis.ipynb` explores the ML-ready output: target
+distributions, carrier/route performance via Polars group-bys, feature
+correlations against `delivery_delay`, and split sanity checks (no `order_id`
+leakage between train and test).
+
+```bash
+jupyter lab      # then open notebooks/01_exploratory_analysis.ipynb
+```
+
+Run the pipeline first — the notebook reads `data/ml_ready/`.
 
 ## 7. Outputs
 
