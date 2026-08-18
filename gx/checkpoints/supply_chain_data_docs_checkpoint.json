@@ -6,12 +6,12 @@
       "type": "update_data_docs"
     }
   ],
-  "id": "bc8ee005-f596-4ae7-83bd-4546fdedd018",
+  "id": "50f50243-c88c-47a8-b793-042a181c3ec1",
   "name": "supply_chain_data_docs_checkpoint",
   "result_format": "SUMMARY",
   "validation_definitions": [
     {
-      "id": "4b39efc2-1af0-48cd-8816-f3c7245e33e5",
+      "id": "1d917ee9-e8a6-4083-b472-375566cbf625",
       "name": "orders_featured_validation"
     }
   ]

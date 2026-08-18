@@ -1,40 +1,11 @@
 {
-  "run_timestamp": "2026-08-18T12:04:47.853772+00:00",
+  "run_timestamp": "2026-08-18T12:16:50.198846+00:00",
   "dataset_rows": 292867,
   "dataset_columns": 37,
   "total_expectations": 21,
-  "passed": 19,
-  "failed": 2,
-  "success_rate_pct": 90.48,
-  "overall_success": false,
-  "failed_expectations": [
-    {
-      "expectation_type": "expect_column_values_to_be_in_set",
-      "kwargs": {
-        "column": "distance_category",
-        "value_set": [
-          "Local",
-          "Regional",
-          "Long-Haul",
-          "International"
-        ]
-      },
-      "unexpected_count": 26,
-      "unexpected_percent": 0.008877749968415697
-    },
-    {
-      "expectation_type": "expect_column_values_to_be_in_set",
-      "kwargs": {
-        "column": "shipment_size_category",
-        "value_set": [
-          "Small",
-          "Medium",
-          "Large",
-          "Bulk"
-        ]
-      },
-      "unexpected_count": 8,
-      "unexpected_percent": 0.002731615374897138
-    }
-  ]
+  "passed": 21,
+  "failed": 0,
+  "success_rate_pct": 100.0,
+  "overall_success": true,
+  "failed_expectations": []
 }

@@ -1,11 +1,11 @@
 {
   "data": {
     "asset": {
-      "id": "10c36c5e-9aaa-4ef7-9f46-4edf5ec94519",
+      "id": "9d43bf4c-bad6-4fed-be80-a6e7fa4b5463",
       "name": "orders_featured"
     },
     "batch_definition": {
-      "id": "d9817634-954c-45c4-80be-fabf0ef90c42",
+      "id": "40bebaf6-fd0c-4de8-857c-0869f7c19ae9",
       "name": "full_table"
     },
     "datasource": {
@@ -13,10 +13,10 @@
       "name": "pandas_supply_chain"
     }
   },
-  "id": "4b39efc2-1af0-48cd-8816-f3c7245e33e5",
+  "id": "1d917ee9-e8a6-4083-b472-375566cbf625",
   "name": "orders_featured_validation",
   "suite": {
-    "id": "6472cc6a-39cc-4ab0-90f6-2be66895331c",
+    "id": "f2064cd8-a209-47b8-9f55-9b2ed6207f6d",
     "name": "supply_chain_orders_suite"
   }
 }

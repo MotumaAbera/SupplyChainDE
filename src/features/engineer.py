@@ -78,9 +78,14 @@ def engineer_features(orders: pd.DataFrame, events: pd.DataFrame) -> pd.DataFram
     # --- 6. distance_category -------------------------------------------------
     # Rationale: non-linear relationship between distance and delay risk;
     # binning lets tree-based and linear models both pick up the effect.
+    # include_lowest: a real 0 km shipment (seller and customer share a
+    # postcode) sits exactly on the first edge. Without it pd.cut leaves the
+    # interval open at the bottom, those rows become NaN, and the category
+    # ends up as the string "nan" -- which then fails the value-set check.
     df["distance_category"] = pd.cut(
         df["distance_km"], bins=[0, 500, 2000, 6000, np.inf],
         labels=["Local", "Regional", "Long-Haul", "International"],
+        include_lowest=True,
     ).astype(str)
 
     # --- 7. warehouse_utilization ------------------------------------------
@@ -130,9 +135,12 @@ def engineer_features(orders: pd.DataFrame, events: pd.DataFrame) -> pd.DataFram
     # Rationale: weight x quantity captures physical shipment bulk, which
     # affects handling time and carrier selection more than either alone.
     bulk = df["weight_kg"] * df["quantity"]
+    # include_lowest for the same reason as distance_category: some real
+    # products carry a recorded weight of 0 g.
     df["shipment_size_category"] = pd.cut(
         bulk, bins=[0, 5, 25, 100, np.inf],
         labels=["Small", "Medium", "Large", "Bulk"],
+        include_lowest=True,
     ).astype(str)
 
     return df

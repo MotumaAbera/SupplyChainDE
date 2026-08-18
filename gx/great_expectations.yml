@@ -89,9 +89,9 @@ fluent_datasources:
     assets:
       orders_featured:
         type: dataframe
-        id: 10c36c5e-9aaa-4ef7-9f46-4edf5ec94519
+        id: 9d43bf4c-bad6-4fed-be80-a6e7fa4b5463
         batch_metadata: {}
         batch_definitions:
           full_table:
-            id: d9817634-954c-45c4-80be-fabf0ef90c42
+            id: 40bebaf6-fd0c-4de8-857c-0869f7c19ae9
             partitioner:
